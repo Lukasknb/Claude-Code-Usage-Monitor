@@ -7,7 +7,7 @@
 
 A beautiful real-time terminal monitoring tool for Claude AI token usage with advanced analytics, machine learning-based predictions, and Rich UI. Track your token consumption, burn rate, cost analysis, and get intelligent predictions about session limits.
 
-![Claude Token Monitor Screenshot](https://raw.githubusercontent.com/Maciek-roboblog/Claude-Code-Usage-Monitor/main/doc/scnew.png)
+![Claude Token Monitor Screenshot](https://raw.githubusercontent.com/Lukasknb/Claude-Code-Usage-Monitor/main/doc/scbilling.png)
 
 ---
 
