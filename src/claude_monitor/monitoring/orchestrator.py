@@ -17,17 +17,34 @@ class MonitoringOrchestrator:
     """Orchestrates monitoring components following SRP."""
 
     def __init__(
-        self, update_interval: int = 10, data_path: Optional[str] = None
+        self, 
+        update_interval: int = 10, 
+        data_path: Optional[str] = None,
+        billing_period_type: str = "none",
+        billing_start_date: Optional[str] = None,
+        billing_reset_day: Optional[int] = None,
+        user_timezone: str = "UTC",
     ) -> None:
         """Initialize orchestrator with components.
 
         Args:
             update_interval: Seconds between updates
             data_path: Optional path to Claude data directory
+            billing_period_type: Type of billing period tracking
+            billing_start_date: Start date for custom billing periods
+            billing_reset_day: Reset day for weekly/monthly periods
+            user_timezone: User's timezone for period calculations
         """
         self.update_interval: int = update_interval
 
-        self.data_manager: DataManager = DataManager(cache_ttl=5, data_path=data_path)
+        self.data_manager: DataManager = DataManager(
+            cache_ttl=5, 
+            data_path=data_path,
+            billing_period_type=billing_period_type,
+            billing_start_date=billing_start_date,
+            billing_reset_day=billing_reset_day,
+            user_timezone=user_timezone,
+        )
         self.session_monitor: SessionMonitor = SessionMonitor()
 
         self._monitoring: bool = False

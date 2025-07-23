@@ -4,7 +4,7 @@ import logging
 import time
 from typing import Any, Dict, Optional
 
-from claude_monitor.data.analysis import analyze_usage
+from claude_monitor.data.analysis import analyze_usage, analyze_usage_with_billing_periods
 from claude_monitor.error_handling import report_error
 
 logger = logging.getLogger(__name__)
@@ -18,6 +18,10 @@ class DataManager:
         cache_ttl: int = 30,
         hours_back: int = 192,
         data_path: Optional[str] = None,
+        billing_period_type: str = "none",
+        billing_start_date: Optional[str] = None,
+        billing_reset_day: Optional[int] = None,
+        user_timezone: str = "UTC",
     ) -> None:
         """Initialize data manager with cache and fetch settings.
 
@@ -25,6 +29,10 @@ class DataManager:
             cache_ttl: Cache time-to-live in seconds
             hours_back: Hours of historical data to fetch
             data_path: Path to data directory
+            billing_period_type: Type of billing period tracking
+            billing_start_date: Start date for custom billing periods
+            billing_reset_day: Reset day for weekly/monthly periods
+            user_timezone: User's timezone for period calculations
         """
         self.cache_ttl: int = cache_ttl
         self._cache: Optional[Dict[str, Any]] = None
@@ -32,6 +40,10 @@ class DataManager:
 
         self.hours_back: int = hours_back
         self.data_path: Optional[str] = data_path
+        self.billing_period_type: str = billing_period_type
+        self.billing_start_date: Optional[str] = billing_start_date
+        self.billing_reset_day: Optional[int] = billing_reset_day
+        self.user_timezone: str = user_timezone
         self._last_error: Optional[str] = None
         self._last_successful_fetch: Optional[float] = None
 
@@ -55,12 +67,25 @@ class DataManager:
                 logger.debug(
                     f"Fetching fresh usage data (attempt {attempt + 1}/{max_retries})"
                 )
-                data: Optional[Dict[str, Any]] = analyze_usage(
-                    hours_back=self.hours_back,
-                    quick_start=False,
-                    use_cache=False,
-                    data_path=self.data_path,
-                )
+                # Use billing period analysis if enabled, otherwise standard analysis
+                if self.billing_period_type != "none":
+                    data: Optional[Dict[str, Any]] = analyze_usage_with_billing_periods(
+                        billing_period_type=self.billing_period_type,
+                        billing_start_date=self.billing_start_date,
+                        billing_reset_day=self.billing_reset_day,
+                        user_timezone=self.user_timezone,
+                        hours_back=self.hours_back,
+                        quick_start=False,
+                        use_cache=False,
+                        data_path=self.data_path,
+                    )
+                else:
+                    data: Optional[Dict[str, Any]] = analyze_usage(
+                        hours_back=self.hours_back,
+                        quick_start=False,
+                        use_cache=False,
+                        data_path=self.data_path,
+                    )
 
                 if data is not None:
                     self._set_cache(data)

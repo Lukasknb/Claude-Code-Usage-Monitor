@@ -33,6 +33,9 @@ class LastUsedParams:
                 "time_format": settings.time_format,
                 "refresh_rate": settings.refresh_rate,
                 "reset_hour": settings.reset_hour,
+                "billing_period": settings.billing_period,
+                "billing_start_date": settings.billing_start_date,
+                "billing_reset_day": settings.billing_reset_day,
                 "timestamp": datetime.now().isoformat(),
             }
 
@@ -151,6 +154,21 @@ class Settings(BaseSettings):
         default=None, ge=0, le=23, description="Reset hour for daily limits (0-23)"
     )
 
+    billing_period: str = Field(
+        default="none",
+        description="Billing period tracking (none, daily, weekly, monthly, custom)",
+    )
+
+    billing_start_date: Optional[str] = Field(
+        default=None,
+        description="Start date for custom billing periods (YYYY-MM-DD format)",
+    )
+
+    billing_reset_day: Optional[int] = Field(
+        default=None,
+        description="Reset day for weekly (0-6, 0=Monday) or monthly (1-31) billing periods",
+    )
+
     log_level: str = Field(default="INFO", description="Logging level")
 
     log_file: Optional[Path] = Field(default=None, description="Log file path")
@@ -219,6 +237,58 @@ class Settings(BaseSettings):
         if v_upper not in valid_levels:
             raise ValueError(f"Invalid log level: {v}")
         return v_upper
+
+    @field_validator("billing_period")
+    @classmethod
+    def validate_billing_period(cls, v: str) -> str:
+        """Validate billing period."""
+        if isinstance(v, str):
+            v_lower = v.lower()
+            valid_periods = ["none", "daily", "weekly", "monthly", "custom"]
+            if v_lower in valid_periods:
+                return v_lower
+            raise ValueError(
+                f"Invalid billing period: {v}. Must be one of: {', '.join(valid_periods)}"
+            )
+        return v
+
+    @field_validator("billing_start_date")
+    @classmethod
+    def validate_billing_start_date(cls, v: Optional[str]) -> Optional[str]:
+        """Validate billing start date format."""
+        if v is None:
+            return v
+        
+        if not isinstance(v, str):
+            raise ValueError("Billing start date must be a string")
+            
+        try:
+            # Try to parse as YYYY-MM-DD
+            datetime.strptime(v, "%Y-%m-%d")
+            return v
+        except ValueError:
+            raise ValueError(
+                "Invalid billing start date format. Use YYYY-MM-DD (e.g., 2024-01-01)"
+            )
+
+    @field_validator("billing_reset_day")
+    @classmethod
+    def validate_billing_reset_day(cls, v: Optional[int]) -> Optional[int]:
+        """Validate billing reset day."""
+        if v is None:
+            return v
+        
+        if not isinstance(v, int):
+            raise ValueError("Billing reset day must be an integer")
+            
+        # Allow 0-6 for weekly (0=Monday) and 1-31 for monthly
+        if not (0 <= v <= 31):
+            raise ValueError(
+                "Billing reset day must be 0-6 for weekly periods (0=Monday) "
+                "or 1-31 for monthly periods"
+            )
+        
+        return v
 
     @classmethod
     def settings_customise_sources(
@@ -329,5 +399,8 @@ class Settings(BaseSettings):
         args.log_level = self.log_level
         args.log_file = str(self.log_file) if self.log_file else None
         args.version = self.version
+        args.billing_period = self.billing_period
+        args.billing_start_date = self.billing_start_date
+        args.billing_reset_day = self.billing_reset_day
 
         return args

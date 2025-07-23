@@ -327,11 +327,67 @@ class SessionDisplayComponent:
             token_limit,
         )
 
+        # Add billing period information if available
+        billing_period_data = kwargs.get("billing_period_data", {})
+        if billing_period_data.get("enabled", False):
+            self._add_billing_period_display(screen_buffer, billing_period_data, timezone)
+
         screen_buffer.append(
             f"⏰ [dim]{current_time_str}[/] 📝 [success]Active session[/] | [dim]Ctrl+C to exit[/] 🟢"
         )
 
         return screen_buffer
+
+    def _add_billing_period_display(self, screen_buffer: list[str], billing_data: dict, timezone: str) -> None:
+        """Add billing period information to the display.
+        
+        Args:
+            screen_buffer: Buffer to append display lines to
+            billing_data: Billing period data from analysis
+            timezone: User timezone for formatting
+        """
+        if not billing_data or not billing_data.get("current_period"):
+            return
+            
+        current_period = billing_data["current_period"]
+        period_info = current_period["period"]
+        usage_info = current_period["usage"]
+        
+        # Add separator
+        screen_buffer.append("────────────────────────────────────────────────────────────")
+        
+        # Period header
+        period_type = period_info["type"].title()
+        screen_buffer.append(f"📅 {period_type} Billing Period:")
+        
+        # Cost information
+        total_cost = usage_info["total_cost"]
+        session_blocks = usage_info["session_blocks_count"]
+        
+        screen_buffer.append(f"   💰 Total cost: [cost.medium]${total_cost:.4f}[/]")
+        screen_buffer.append(f"   📊 Sessions: [info]{session_blocks}[/]")
+        screen_buffer.append(f"   🎯 Tokens: [value]{usage_info['total_tokens']:,}[/]")
+        
+        # Next reset information
+        try:
+            from datetime import datetime
+            next_reset = datetime.fromisoformat(billing_data["next_reset"])
+            time_until_reset = billing_data["time_until_reset"]
+            
+            if time_until_reset > 0:
+                days = int(time_until_reset // (24 * 3600))
+                hours = int((time_until_reset % (24 * 3600)) // 3600)
+                
+                if days > 0:
+                    reset_str = f"{days}d {hours}h"
+                else:
+                    reset_str = f"{hours}h"
+                    
+                screen_buffer.append(f"   ⏱️  Resets in: [success]{reset_str}[/]")
+        except (ValueError, KeyError):
+            pass
+            
+        screen_buffer.append("")
 
     def _add_notifications(
         self,

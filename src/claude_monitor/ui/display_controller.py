@@ -367,6 +367,9 @@ class DisplayController:
             args, current_time, cost_data["predicted_end_time"], time_data["reset_time"]
         )
 
+        # Extract billing period data if available
+        billing_period_data = data.get("billing_periods", {})
+
         # Build result dictionary
         return {
             "plan": args.plan,
@@ -390,6 +393,7 @@ class DisplayController:
             "show_exceed_notification": notifications["show_exceed_notification"],
             "show_tokens_will_run_out": notifications["show_cost_will_exceed"],
             "original_limit": original_limit,
+            "billing_period_data": billing_period_data,
         }
 
     def _calculate_model_distribution(

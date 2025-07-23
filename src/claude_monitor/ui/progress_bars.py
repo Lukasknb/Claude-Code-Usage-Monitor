@@ -331,3 +331,44 @@ class ModelUsageBar(BaseProgressBar):
             summary = f"Other {other_percentage:.1f}%"
 
         return f"🤖 [{bar_display}] {summary}"
+
+
+class CostProgressBar(BaseProgressBar):
+    """Cost/billing progress bar component."""
+
+    # Color threshold constants for cost display
+    HIGH_COST_THRESHOLD: Final[float] = 80.0
+    MEDIUM_COST_THRESHOLD: Final[float] = 50.0
+    LOW_COST_THRESHOLD: Final[float] = 0.0
+
+    # Style constants
+    HIGH_COST_STYLE: Final[str] = "cost.high"
+    MEDIUM_COST_STYLE: Final[str] = "cost.medium"
+    LOW_COST_STYLE: Final[str] = "cost.low"
+    BORDER_STYLE: Final[str] = "table.border"
+
+    def render(self, percentage: float, show_percentage: bool = True) -> str:
+        """Render cost progress bar.
+
+        Args:
+            percentage: Cost percentage (can be > 100)
+            show_percentage: Whether to show percentage text
+
+        Returns:
+            Formatted progress bar string
+        """
+        filled: int = self._calculate_filled_segments(min(percentage, 100.0))
+
+        color_thresholds: list[tuple[float, str]] = [
+            (self.HIGH_COST_THRESHOLD, self.HIGH_COST_STYLE),
+            (self.MEDIUM_COST_THRESHOLD, self.MEDIUM_COST_STYLE),
+            (self.LOW_COST_THRESHOLD, self.LOW_COST_STYLE),
+        ]
+
+        style = self._get_style_for_value(percentage, color_thresholds)
+        bar = self._render_bar(filled, filled_style=style, empty_style=self.BORDER_STYLE)
+
+        if show_percentage:
+            return f"[{bar}] {percentage:.1f}%"
+        else:
+            return f"[{bar}]"

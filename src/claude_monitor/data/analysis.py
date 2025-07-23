@@ -7,8 +7,15 @@ import logging
 from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
 
+from claude_monitor.core.billing_periods import BillingPeriodCalculator
 from claude_monitor.core.calculations import BurnRateCalculator
-from claude_monitor.core.models import CostMode, SessionBlock, UsageEntry
+from claude_monitor.core.models import (
+    BillingPeriodSummary,
+    BillingPeriodType,
+    CostMode,
+    SessionBlock,
+    UsageEntry,
+)
 from claude_monitor.data.analyzer import SessionAnalyzer
 from claude_monitor.data.reader import load_usage_entries
 
@@ -98,6 +105,152 @@ def analyze_usage(
     result = _create_result(blocks, entries, metadata)
     logger.info(f"analyze_usage returning {len(result['blocks'])} blocks")
     return result
+
+
+def analyze_usage_with_billing_periods(
+    billing_period_type: str = "none",
+    billing_start_date: Optional[str] = None,
+    billing_reset_day: Optional[int] = None,
+    user_timezone: str = "UTC",
+    hours_back: Optional[int] = 96,
+    use_cache: bool = True,
+    quick_start: bool = False,
+    data_path: Optional[str] = None,
+) -> Dict[str, Any]:
+    """
+    Analyze usage with billing period aggregation support.
+
+    Args:
+        billing_period_type: Type of billing period (none, daily, weekly, monthly, custom)
+        billing_start_date: Start date for custom billing periods (YYYY-MM-DD)
+        billing_reset_day: Reset day for weekly/monthly periods
+        user_timezone: User's timezone for period calculations
+        hours_back: Only analyze data from last N hours (None = all data)
+        use_cache: Use cached data when available
+        quick_start: Use minimal data for quick startup
+        data_path: Optional path to Claude data directory
+
+    Returns:
+        Dictionary with analyzed blocks and optional billing period data
+    """
+    logger.info(
+        f"analyze_usage_with_billing_periods called with billing_period={billing_period_type}, "
+        f"hours_back={hours_back}, use_cache={use_cache}"
+    )
+
+    # First get the standard session block analysis
+    result = analyze_usage(
+        hours_back=hours_back,
+        use_cache=use_cache,
+        quick_start=quick_start,
+        data_path=data_path,
+    )
+
+    # If billing period tracking is disabled, return standard result
+    if billing_period_type == "none":
+        return result
+
+    # Extract session blocks from the result (they're already processed as dicts)
+    blocks_data = result.get("blocks", [])
+
+    if not blocks_data:
+        logger.info("No session blocks to analyze for billing periods")
+        return result
+
+    # Set up billing period calculator
+    try:
+        period_type_enum = BillingPeriodType(billing_period_type)
+    except ValueError:
+        logger.warning(f"Invalid billing period type: {billing_period_type}")
+        return result
+
+    # Parse custom start date if provided
+    custom_start_date = None
+    if billing_start_date:
+        try:
+            custom_start_date = datetime.strptime(billing_start_date, "%Y-%m-%d")
+        except ValueError:
+            logger.warning(f"Invalid billing start date format: {billing_start_date}")
+
+    calculator = BillingPeriodCalculator(
+        period_type=period_type_enum,
+        custom_start_date=custom_start_date,
+        reset_day=billing_reset_day,
+        user_timezone=user_timezone,
+    )
+
+    # For now, just add basic billing period information without full integration
+    # TODO: Implement proper session block to billing period conversion
+    current_period = calculator.get_current_period()
+    next_reset = calculator.get_next_reset_time()
+    time_until_reset = calculator.get_time_until_reset()
+
+    # Calculate total cost from blocks data
+    total_cost = sum(block.get("costUSD", 0) for block in blocks_data)
+
+    billing_summaries = [{
+        "period": {
+            "type": current_period.period_type.value,
+            "start_time": current_period.start_time.isoformat(),
+            "end_time": current_period.end_time.isoformat(),
+            "is_current": current_period.is_current,
+            "duration_days": current_period.duration_days,
+        },
+        "usage": {
+            "total_cost": total_cost,
+            "total_tokens": sum(block.get("totalTokens", 0) for block in blocks_data),
+            "entries_count": sum(len(block.get("entries", [])) for block in blocks_data),
+            "session_blocks_count": len(blocks_data),
+        }
+    }]
+
+    # Add billing period data to result
+    result["billing_periods"] = {
+        "enabled": True,
+        "period_type": billing_period_type,
+        "current_period": billing_summaries[0] if billing_summaries else None,
+        "recent_periods": billing_summaries,
+        "next_reset": next_reset.isoformat(),
+        "time_until_reset": time_until_reset.total_seconds(),
+    }
+
+    logger.info(f"Added {len(billing_summaries)} billing period summaries to result")
+    return result
+
+
+def _format_billing_period_summary(summary: BillingPeriodSummary) -> Dict[str, Any]:
+    """Format billing period summary for JSON serialization."""
+    return {
+        "period": {
+            "type": summary.period.period_type.value,
+            "start_time": summary.period.start_time.isoformat(),
+            "end_time": summary.period.end_time.isoformat(),
+            "is_current": summary.period.is_current,
+            "duration_days": summary.period.duration_days,
+            "custom_label": summary.period.custom_label,
+        },
+        "usage": {
+            "total_cost": summary.total_cost,
+            "total_tokens": summary.total_tokens_calculated,
+            "entries_count": summary.entries_count,
+            "session_blocks_count": len(summary.session_blocks),
+            "models_used": summary.models_used,
+            "per_model_costs": summary.per_model_costs,
+            "average_cost_per_day": summary.average_cost_per_day,
+            "cost_percentage_of_period": summary.cost_percentage_of_period,
+        },
+        "tokens": {
+            "input_tokens": summary.token_counts.input_tokens,
+            "output_tokens": summary.token_counts.output_tokens,
+            "cache_creation_tokens": summary.token_counts.cache_creation_tokens,
+            "cache_read_tokens": summary.token_counts.cache_read_tokens,
+            "total_tokens": summary.token_counts.total_tokens,
+        },
+        "timestamps": {
+            "first_usage": summary.first_usage.isoformat() if summary.first_usage else None,
+            "last_usage": summary.last_usage.isoformat() if summary.last_usage else None,
+        },
+    }
 
 
 def _process_burn_rates(

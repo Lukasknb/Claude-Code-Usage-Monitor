@@ -63,6 +63,7 @@ A beautiful real-time terminal monitoring tool for Claude AI token usage with ad
 - **🧪 Extensive testing** - 100+ test cases with full coverage
 - **🎯 Error reporting** - Optional Sentry integration for production monitoring
 - **⚡ Performance optimized** - Advanced caching and efficient data processing
+- **💰 Billing period tracking** - Monitor costs across daily, weekly, monthly, or custom periods
 
 ### 📋 Default Custom Plan
 
@@ -194,6 +195,9 @@ claude-monitor --help
 | --refresh-rate | int | 10 | Data refresh rate in seconds (1-60) |
 | --refresh-per-second | float | 0.75 | Display refresh rate in Hz (0.1-20.0) |
 | --reset-hour | int | None | Daily reset hour (0-23) |
+| --billing-period | string | none | Billing period type: none, daily, weekly, monthly, custom |
+| --billing-start-date | string | None | Custom billing start date (YYYY-MM-DD format) |
+| --billing-reset-day | int | None | Billing reset day (0-6 for weekly, 1-31 for monthly) |
 | --log-level | string | INFO | Logging level: DEBUG, INFO, WARNING, ERROR, CRITICAL |
 | --log-file | path | None | Log file path |
 | --debug | flag | False | Enable debug logging |
@@ -341,6 +345,52 @@ claude-monitor --timezone UTC
 # Use London time
 claude-monitor --timezone Europe/London
 ```
+
+#### Billing Period Tracking
+
+**NEW in v3.0.3**: Track costs across different billing periods to better understand your usage patterns beyond the standard 5-hour session windows.
+
+```bash
+# Enable daily billing period tracking
+claude-monitor --billing-period daily
+
+# Weekly billing periods (reset on Mondays by default)
+claude-monitor --billing-period weekly
+
+# Monthly billing periods (reset on 1st by default)
+claude-monitor --billing-period monthly
+
+# Custom billing periods with specific start date
+claude-monitor --billing-period custom --billing-start-date 2024-01-15
+
+# Weekly periods with custom reset day (Wednesday = 2)
+claude-monitor --billing-period weekly --billing-reset-day 2
+
+# Monthly periods with custom reset day (15th of each month)
+claude-monitor --billing-period monthly --billing-reset-day 15
+```
+
+**Billing Period Types:**
+
+| Period Type | Description | Reset Behavior | Example Use Case |
+|-------------|-------------|----------------|------------------|
+| **none** | Disabled (default) | No billing tracking | Standard session monitoring |
+| **daily** | 24-hour periods | Midnight or custom hour | Daily budget tracking |
+| **weekly** | 7-day periods | Monday or custom weekday | Weekly project cycles |
+| **monthly** | Calendar months | 1st or custom day | Monthly subscription billing |
+| **custom** | Fixed intervals | Custom start date + 30 days | Custom billing cycles |
+
+**Reset Day Options:**
+- **Daily**: Hour of day (0-23)
+- **Weekly**: Day of week (0=Monday, 1=Tuesday, ..., 6=Sunday)
+- **Monthly**: Day of month (1-31, automatically adjusted for shorter months)
+- **Custom**: Specific start date in YYYY-MM-DD format
+
+**Display Features:**
+- Total cost across the current billing period
+- Session count and token usage
+- Time remaining until next reset
+- Seamless integration with existing session monitoring
 
 #### Logging and Debugging
 
@@ -638,6 +688,29 @@ claude-monitor --timezone Asia/Singapore
 # UTC for international team coordination
 claude-monitor --timezone UTC --reset-hour 12
 ```
+
+#### 💰 Budget-Conscious User
+**Scenario**: You want to track costs across different billing periods to manage your Claude usage budget.
+
+```bash
+# Track daily spending with custom reset time
+claude-monitor --plan pro --billing-period daily --billing-reset-day 6  # 6 AM reset
+
+# Monthly budget tracking (resets on 10th of each month)
+claude-monitor --plan pro --billing-period monthly --billing-reset-day 10
+
+# Weekly project cycles (reset on Wednesdays)
+claude-monitor --plan max5 --billing-period weekly --billing-reset-day 2
+
+# Custom billing cycle starting from a specific date
+claude-monitor --plan custom --billing-period custom --billing-start-date 2024-01-15
+```
+
+**Benefits:**
+- See total costs across longer time periods
+- Better budget planning and expense tracking
+- Understanding usage patterns beyond 5-hour sessions
+- Track progress toward monthly or weekly spending limits
 
 
 #### ⚡ Quick Check

@@ -155,6 +155,10 @@ def _run_monitoring(args: argparse.Namespace) -> None:
                 if hasattr(args, "refresh_rate")
                 else 10,
                 data_path=str(data_path),
+                billing_period_type=args.billing_period,
+                billing_start_date=args.billing_start_date,
+                billing_reset_day=args.billing_reset_day,
+                user_timezone=args.timezone,
             )
             orchestrator.set_args(args)
 
